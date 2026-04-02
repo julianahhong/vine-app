@@ -42,7 +42,7 @@ export default async function LandingPage() {
       </div>
 
       <p className="mt-12 text-center text-xs text-gray-400">
-        Vine Tutoring · Queens, New York
+        Vine Tutoring · Kips Bay, New York
       </p>
     </div>
   )
