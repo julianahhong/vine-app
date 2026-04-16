@@ -116,6 +116,8 @@ const module: Module = {
     },
   ],
   teachingScenario: 'You just arrived at a church community event in Queens. You want to meet the people there but do not know how to introduce yourself or start a conversation in English.',
+  homeworkUrl: 'https://www.usalearns.org/unit1',
+  homeworkLabel: 'USA Learns Unit 1 – Meeting People',
 }
 
 export default module

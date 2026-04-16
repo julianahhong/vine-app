@@ -39,6 +39,8 @@ export interface Module {
   vocab: VocabItem[]
   quiz: QuizQuestion[]
   teachingScenario: string
+  homeworkUrl: string
+  homeworkLabel: string
 }
 
 export interface VocabProgress {
@@ -83,4 +85,19 @@ export interface ActivityLog {
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
+}
+
+export interface Session {
+  id: string
+  date: string
+  moduleSlug: string
+  tutorId: string
+  homeworkAssigned: boolean
+  createdAt: number
+}
+
+export interface AttendanceRecord {
+  sessionDate: string
+  studentId: string
+  present: boolean
 }

@@ -116,6 +116,8 @@ const module: Module = {
     },
   ],
   teachingScenario: 'You are at a clothing store in New York. You need to find a coat for winter but you do not know your size in American sizes, and you need help asking about the fitting room, prices, and whether items come in different colors.',
+  homeworkUrl: 'https://www.duolingo.com/learn',
+  homeworkLabel: 'Duolingo – Shopping & Clothing',
 }
 
 export default module

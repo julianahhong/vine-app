@@ -1,5 +1,6 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 
 export default async function TutorLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession()
@@ -14,9 +15,13 @@ export default async function TutorLayout({ children }: { children: React.ReactN
           <p className="font-bold">Vine Tutoring</p>
           <p className="text-amber-100 text-xs">Tutor: {session.name}</p>
         </div>
-        <form action="/api/auth/logout" method="POST">
-          <button type="submit" className="text-amber-200 text-xs hover:text-white">Exit</button>
-        </form>
+        <nav className="flex items-center gap-3">
+          <Link href="/tutor/session" className="text-amber-200 text-xs hover:text-white">Session</Link>
+          <Link href="/tutor/cohort" className="text-amber-200 text-xs hover:text-white">Cohort</Link>
+          <form action="/api/auth/logout" method="POST">
+            <button type="submit" className="text-amber-200 text-xs hover:text-white">Exit</button>
+          </form>
+        </nav>
       </header>
       {children}
     </div>

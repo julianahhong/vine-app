@@ -116,6 +116,8 @@ const module: Module = {
     },
   ],
   teachingScenario: 'You need to take the subway from Jackson Heights, Queens to Manhattan to get to a job interview, but you do not understand the subway signs, do not know which train to take, and are not sure how to buy a MetroCard.',
+  homeworkUrl: 'https://www.duolingo.com/learn',
+  homeworkLabel: 'Duolingo – Travel & Directions',
 }
 
 export default module

@@ -116,6 +116,8 @@ const module: Module = {
     },
   ],
   teachingScenario: 'You are having a conversation with someone in English but you keep forgetting how to build full sentences. You know individual words but struggle to connect them together and to express what you want or need.',
+  homeworkUrl: 'https://www.usalearns.org/unit4',
+  homeworkLabel: 'USA Learns Unit 4 – Building Sentences',
 }
 
 export default module

@@ -75,6 +75,22 @@ function initSchema(db: Database.Database) {
       count INTEGER NOT NULL DEFAULT 1,
       PRIMARY KEY (user_id, date, activity_type)
     );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      date TEXT NOT NULL UNIQUE,
+      module_slug TEXT NOT NULL,
+      tutor_id TEXT NOT NULL,
+      homework_assigned INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS attendance (
+      session_date TEXT NOT NULL,
+      student_id TEXT NOT NULL,
+      present INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (session_date, student_id)
+    );
   `)
 }
 

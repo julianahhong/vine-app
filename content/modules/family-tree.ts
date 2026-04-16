@@ -116,6 +116,8 @@ const module: Module = {
     },
   ],
   teachingScenario: 'You are talking with a new friend at the church. They want to know about your family, and you want to ask about their family too, but you do not know the English words for family members.',
+  homeworkUrl: 'https://www.usalearns.org/unit3',
+  homeworkLabel: 'USA Learns Unit 3 – Family',
 }
 
 export default module

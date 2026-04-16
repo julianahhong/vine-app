@@ -116,6 +116,8 @@ const module: Module = {
     },
   ],
   teachingScenario: 'You are at a supermarket in Queens. You need to buy rice, bread, and vegetables but do not know how to ask where things are, how much they cost, or how to pay.',
+  homeworkUrl: 'https://www.usalearns.org/unit2',
+  homeworkLabel: 'USA Learns Unit 2 – Shopping',
 }
 
 export default module
