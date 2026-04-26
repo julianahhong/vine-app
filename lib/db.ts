@@ -91,6 +91,30 @@ function initSchema(db: Database.Database) {
       present INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (session_date, student_id)
     );
+
+    CREATE TABLE IF NOT EXISTS math_progress (
+      user_id TEXT PRIMARY KEY,
+      skill_mastery TEXT NOT NULL DEFAULT '{}',
+      current_skill TEXT,
+      diagnostic_done INTEGER NOT NULL DEFAULT 0,
+      total_problems INTEGER NOT NULL DEFAULT 0,
+      total_correct INTEGER NOT NULL DEFAULT 0,
+      mistake_profile TEXT NOT NULL DEFAULT '{}',
+      skill_attempt_counts TEXT NOT NULL DEFAULT '{}',
+      updated_at INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS math_sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      session_type TEXT NOT NULL,
+      started_at INTEGER NOT NULL,
+      ended_at INTEGER NOT NULL,
+      total_problems INTEGER NOT NULL DEFAULT 0,
+      correct INTEGER NOT NULL DEFAULT 0,
+      accuracy INTEGER NOT NULL DEFAULT 0,
+      current_skill TEXT NOT NULL DEFAULT ''
+    );
   `)
 }
 

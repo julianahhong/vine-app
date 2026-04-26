@@ -3,6 +3,18 @@ import getDb from '@/lib/db'
 import Link from 'next/link'
 import { ALL_MODULES } from '@/content/modules'
 
+const LB_TYPES = [
+  { key: 'practice_5', label: '5 min', isTimed: true },
+  { key: 'practice_10', label: '10 min', isTimed: true },
+  { key: 'flat_10', label: '10 Q', isTimed: false },
+  { key: 'flat_25', label: '25 Q', isTimed: false },
+] as const
+
+function fmtTime(ms: number) {
+  const s = Math.round(ms / 1000)
+  return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
+}
+
 export default async function TutorDashboardPage() {
   const session = await getSession()
   const db = getDb()
@@ -29,6 +41,25 @@ export default async function TutorDashboardPage() {
     }
   })
 
+  // Leaderboard data for all session types
+  const leaderboards = LB_TYPES.map(({ key, label, isTimed }) => {
+    const rows = isTimed
+      ? db.prepare(`
+          SELECT ms.user_id, u.name, ms.correct, ms.accuracy, ms.total_problems
+          FROM math_sessions ms JOIN users u ON u.id = ms.user_id
+          WHERE ms.session_type = ?
+          ORDER BY ms.correct DESC, ms.accuracy DESC LIMIT 5
+        `).all(key) as Array<{ user_id: string; name: string; correct: number; accuracy: number; total_problems: number }>
+      : db.prepare(`
+          SELECT ms.user_id, u.name, ms.correct, ms.total_problems, ms.accuracy,
+                 (ms.ended_at - ms.started_at) as duration_ms
+          FROM math_sessions ms JOIN users u ON u.id = ms.user_id
+          WHERE ms.session_type = ? AND ms.ended_at > ms.started_at
+          ORDER BY ms.correct DESC, (ms.ended_at - ms.started_at) ASC LIMIT 5
+        `).all(key) as Array<{ user_id: string; name: string; correct: number; total_problems: number; accuracy: number; duration_ms: number }>
+    return { key, label, isTimed, rows }
+  }).filter(lb => lb.rows.length > 0)
+
   return (
     <div className="max-w-lg mx-auto w-full px-4 py-6">
       <h1 className="text-2xl font-bold text-amber-800 mb-1">Your Students</h1>
@@ -39,6 +70,44 @@ export default async function TutorDashboardPage() {
         <div className="text-center py-12 text-gray-400">
           <p className="text-4xl mb-3">👥</p>
           <p>No students yet. Students will appear here when they log in.</p>
+        </div>
+      )}
+
+      {/* Math Leaderboard */}
+      {leaderboards.length > 0 && (
+        <div className="mb-8">
+          <h2 className="font-bold text-gray-700 mb-3">➕ Math Leaderboard</h2>
+          <div className="space-y-4">
+            {leaderboards.map(lb => (
+              <div key={lb.key} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                <p className="text-sm font-semibold text-gray-600 mb-3">{lb.label}</p>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th className="text-left text-xs text-gray-400 font-semibold pb-1.5 w-6">#</th>
+                      <th className="text-left text-xs text-gray-400 font-semibold pb-1.5">Student</th>
+                      <th className="text-right text-xs text-gray-400 font-semibold pb-1.5">
+                        {lb.isTimed ? 'Score' : 'Time'}
+                      </th>
+                      <th className="text-right text-xs text-gray-400 font-semibold pb-1.5">Acc.</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {lb.rows.map((row, i) => (
+                      <tr key={i}>
+                        <td className="py-1.5 text-gray-400 font-bold text-xs">{i + 1}</td>
+                        <td className="py-1.5 text-gray-700">{row.name}</td>
+                        <td className="py-1.5 text-right font-semibold text-gray-700">
+                          {lb.isTimed ? row.correct : fmtTime((row as unknown as { duration_ms: number }).duration_ms)}
+                        </td>
+                        <td className="py-1.5 text-right text-gray-500 text-xs">{row.accuracy}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

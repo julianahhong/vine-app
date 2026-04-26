@@ -32,6 +32,11 @@ export default async function HomePage() {
   const vocabMastered = db.prepare('SELECT COUNT(*) as count FROM vocab_progress WHERE user_id = ? AND correct_count >= 3').get(session!.userId) as { count: number }
   const teachSessions = db.prepare('SELECT COUNT(*) as count FROM teaching_sessions WHERE user_id = ?').get(session!.userId) as { count: number }
 
+  const mathProgressRow = db.prepare('SELECT total_problems, total_correct, diagnostic_done FROM math_progress WHERE user_id = ?').get(session!.userId) as {
+    total_problems: number; total_correct: number; diagnostic_done: number
+  } | undefined
+  const mathSessions = db.prepare('SELECT COUNT(*) as count FROM math_sessions WHERE user_id = ?').get(session!.userId) as { count: number }
+
   const streak = getStreak(activityLog)
   const completedModules = moduleProgress.filter(m => m.practice_completed_at).length
 
@@ -90,6 +95,22 @@ export default async function HomePage() {
           <p className="text-xs text-gray-400">Enseñado</p>
         </div>
       </div>
+
+      {/* Math Practice Banner */}
+      {mathProgressRow && mathProgressRow.total_problems > 0 && (
+        <Link href="/practice?mode=math" className="block mb-4">
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">➕</span>
+              <div>
+                <p className="font-semibold text-sm text-gray-800">Math Practice</p>
+                <p className="text-xs text-gray-500">{mathProgressRow.total_problems} problems · {mathProgressRow.total_problems ? Math.round(mathProgressRow.total_correct / mathProgressRow.total_problems * 100) : 0}% accuracy</p>
+              </div>
+            </div>
+            <span className="text-gray-300 text-lg">→</span>
+          </div>
+        </Link>
+      )}
 
       {/* Teaching Mode Banner */}
       <Link href="/modules" className="block mb-6">

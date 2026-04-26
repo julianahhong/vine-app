@@ -2,8 +2,15 @@ import { getSession } from '@/lib/auth'
 import getDb from '@/lib/db'
 import { notFound } from 'next/navigation'
 import { ALL_MODULES } from '@/content/modules'
+import { SKILLS } from '@/lib/math'
 import Link from 'next/link'
 import PrepNoteButton from './PrepNoteButton'
+
+function mathMasteryColor(v: number) {
+  if (v >= 0.75) return 'bg-green-500'
+  if (v >= 0.4) return 'bg-yellow-400'
+  return 'bg-red-400'
+}
 
 export default async function StudentDetailPage({ params }: { params: Promise<{ studentId: string }> }) {
   const { studentId } = await params
@@ -25,6 +32,21 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
     id: string; module_slug: string; started_at: number; phrases_taught: string
   }>
   const lastActivity = db.prepare('SELECT date FROM activity_log WHERE user_id = ? ORDER BY date DESC LIMIT 1').get(studentId) as { date: string } | undefined
+
+  const mathRow = db.prepare('SELECT * FROM math_progress WHERE user_id = ?').get(studentId) as {
+    skill_mastery: string; current_skill: string | null; diagnostic_done: number
+    total_problems: number; total_correct: number; skill_attempt_counts: string
+  } | undefined
+  const mathMastery: Record<string, number> = mathRow ? JSON.parse(mathRow.skill_mastery) : {}
+  const mathCounts: Record<string, number> = mathRow ? JSON.parse(mathRow.skill_attempt_counts) : {}
+  const mathTotal = mathRow?.total_problems ?? 0
+  const mathCorrect = mathRow?.total_correct ?? 0
+  const mathCurrentSkill = mathRow?.current_skill ?? null
+  const mathDiagDone = mathRow?.diagnostic_done === 1
+
+  const mathSessionCounts = db.prepare(
+    'SELECT session_type, COUNT(*) as count FROM math_sessions WHERE user_id = ? GROUP BY session_type'
+  ).all(studentId) as Array<{ session_type: string; count: number }>
 
   const completedModules = moduleProgress.filter(m => m.practice_completed_at).map(m => {
     const mod = ALL_MODULES.find(mm => mm.slug === m.module_slug)
@@ -131,6 +153,92 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
           </div>
         </div>
       )}
+
+      {/* Math Progress */}
+      <div className="mb-6">
+        <h3 className="font-bold text-gray-700 mb-3">➕ Math Progress</h3>
+        {!mathDiagDone ? (
+          <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 text-center">
+            <p className="text-sm text-gray-400">Diagnostic not yet taken</p>
+          </div>
+        ) : (
+          <>
+            <div className="flex gap-3 mb-3">
+              <div className="bg-white rounded-xl p-3 border border-gray-100 flex-1 text-center">
+                <p className="text-xl font-bold text-green-700">{mathTotal}</p>
+                <p className="text-xs text-gray-500">Problems</p>
+              </div>
+              <div className="bg-white rounded-xl p-3 border border-gray-100 flex-1 text-center">
+                <p className="text-xl font-bold text-blue-600">
+                  {mathTotal ? Math.round(mathCorrect / mathTotal * 100) : 0}%
+                </p>
+                <p className="text-xs text-gray-500">Accuracy</p>
+              </div>
+            </div>
+
+            {mathSessionCounts.length > 0 && (
+              <div className="bg-white rounded-xl p-3 border border-gray-100 mb-3">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Sessions</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { key: 'practice_5', label: '5 min' },
+                    { key: 'practice_10', label: '10 min' },
+                    { key: 'flat_10', label: '10 Q' },
+                    { key: 'flat_25', label: '25 Q' },
+                    { key: 'custom', label: 'Custom' },
+                    { key: 'diagnostic', label: 'Diagnostic' },
+                  ].map(({ key, label }) => {
+                    const row = mathSessionCounts.find(r => r.session_type === key)
+                    if (!row) return null
+                    return (
+                      <div key={key} className="flex items-center gap-1.5 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                        <span className="text-sm font-bold text-green-700">{row.count}</span>
+                        <span className="text-xs text-gray-500">{label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {[
+              { label: 'Addition & Subtraction', ops: ['addition', 'subtraction', 'mixed'] },
+              { label: 'Multiplication & Division', ops: ['multiplication', 'division'] },
+            ].map(g => (
+              <div key={g.label} className="mb-3">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">{g.label}</p>
+                <div className="bg-white rounded-xl p-3 border border-gray-100 space-y-2.5">
+                  {SKILLS.filter(s => g.ops.includes(s.operation)).map(s => {
+                    const pct = Math.round((mathMastery[s.tag] ?? 0) * 100)
+                    const count = mathCounts[s.tag] || 0
+                    return (
+                      <div key={s.tag}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className={`text-xs flex items-center gap-1 ${pct === 0 ? 'text-gray-400' : 'text-gray-700'}`}>
+                            {s.label}
+                            {s.tag === mathCurrentSkill && (
+                              <span className="bg-green-100 text-green-700 text-xs font-semibold px-1 py-0.5 rounded-full">current</span>
+                            )}
+                          </span>
+                          <span className={`text-xs font-bold ${pct === 0 ? 'text-gray-300' : pct < 40 ? 'text-red-500' : 'text-green-700'}`}>
+                            {pct > 0 ? `${pct}%` : count > 0 ? `${pct}%` : '—'}
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-1.5">
+                          {pct > 0 && (
+                            <div className={`h-1.5 rounded-full ${mathMasteryColor(mathMastery[s.tag] ?? 0)}`} style={{ width: `${pct}%` }} />
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+
+          </>
+        )}
+      </div>
 
       {/* Teaching Sessions */}
       {teachingSessions.length > 0 && (
