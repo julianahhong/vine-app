@@ -147,12 +147,13 @@ export default function MathClient({ initialProgress, initialHistory, initialSki
   const answerInputRef = useRef<HTMLInputElement>(null)
 
   // Auto-start focused session if arriving from a skill lesson page
+  const didAutoStart = useRef(false)
   useEffect(() => {
-    if (initialSkillFocus && diagDoneRef.current) {
+    if (initialSkillFocus && diagDoneRef.current && !didAutoStart.current) {
+      didAutoStart.current = true
       pinnedTagsRef.current = [initialSkillFocus]
       setSelectedSkills([initialSkillFocus])
-      // Small delay so component finishes mounting
-      setTimeout(() => startPractice('custom'), 100)
+      startPractice('custom')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -192,7 +193,7 @@ export default function MathClient({ initialProgress, initialHistory, initialSki
         mistake_profile: mistakeProfileRef.current,
         skill_attempt_counts: skillCountsRef.current,
       }),
-    })
+    }).catch(err => console.warn('Failed to save math progress:', err))
   }
 
   async function persistSession(record: MathSessionRecord) {
@@ -200,7 +201,7 @@ export default function MathClient({ initialProgress, initialHistory, initialSki
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(record),
-    })
+    }).catch(err => console.warn('Failed to save math session:', err))
   }
 
   async function loadLeaderboard(type: SessionType) {

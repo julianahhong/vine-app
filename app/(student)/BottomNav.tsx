@@ -7,7 +7,7 @@ const NAV_ITEMS = [
   { href: '/home', label: 'Home', labelEs: 'Inicio', emoji: '🏠' },
   { href: '/modules', label: 'Learn', labelEs: 'Aprender', emoji: '📖' },
   { href: '/practice', label: 'Practice', labelEs: 'Practicar', emoji: '🔄' },
-{ href: '/progress', label: 'Progress', labelEs: 'Progreso', emoji: '⭐' },
+  { href: '/progress', label: 'Progress', labelEs: 'Progreso', emoji: '⭐' },
 ]
 
 export default function BottomNav() {

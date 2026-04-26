@@ -6,7 +6,11 @@ export async function GET(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const VALID_TYPES = ['practice_5', 'practice_10', 'flat_10', 'flat_25']
   const type = req.nextUrl.searchParams.get('type') || 'practice_5'
+  if (!VALID_TYPES.includes(type)) {
+    return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+  }
   const isTimed = type === 'practice_5' || type === 'practice_10'
   const db = getDb()
 
