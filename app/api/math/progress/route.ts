@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import getDb from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { SKILLS } from '@/lib/math'
+
+const VALID_SKILL_TAGS = new Set(SKILLS.map(s => s.tag))
+const MAX_PROBLEMS = 100_000
 
 export async function GET() {
   const session = await getSession()
@@ -45,8 +49,51 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const db = getDb()
 
+  // Validate numeric totals
+  const totalProblems = Number(body.total_problems) || 0
+  const totalCorrect = Number(body.total_correct) || 0
+  if (totalProblems < 0 || totalCorrect < 0) {
+    return NextResponse.json({ error: 'Invalid totals' }, { status: 400 })
+  }
+  if (totalCorrect > totalProblems) {
+    return NextResponse.json({ error: 'total_correct cannot exceed total_problems' }, { status: 400 })
+  }
+  if (totalProblems > MAX_PROBLEMS) {
+    return NextResponse.json({ error: 'total_problems out of range' }, { status: 400 })
+  }
+
+  // Sanitize skill_mastery: only keep known skill tags, clamp values to [0, 1]
+  const rawMastery = body.skill_mastery && typeof body.skill_mastery === 'object' ? body.skill_mastery : {}
+  const skillMastery: Record<string, number> = {}
+  for (const tag of VALID_SKILL_TAGS) {
+    if (tag in rawMastery) {
+      skillMastery[tag] = Math.min(1, Math.max(0, Number(rawMastery[tag]) || 0))
+    }
+  }
+
+  // Sanitize skill_attempt_counts: only known tags, non-negative integers
+  const rawCounts = body.skill_attempt_counts && typeof body.skill_attempt_counts === 'object' ? body.skill_attempt_counts : {}
+  const skillAttemptCounts: Record<string, number> = {}
+  for (const tag of VALID_SKILL_TAGS) {
+    if (tag in rawCounts) {
+      skillAttemptCounts[tag] = Math.min(MAX_PROBLEMS, Math.max(0, Math.floor(Number(rawCounts[tag]) || 0)))
+    }
+  }
+
+  // Sanitize mistake_profile: only known keys, non-negative numbers
+  const VALID_MISTAKE_KEYS = new Set(['carry_error', 'borrow_error', 'arithmetic_fact_error', 'sign_error'])
+  const rawProfile = body.mistake_profile && typeof body.mistake_profile === 'object' ? body.mistake_profile : {}
+  const mistakeProfile: Record<string, number> = {}
+  for (const key of VALID_MISTAKE_KEYS) {
+    mistakeProfile[key] = Math.max(0, Number(rawProfile[key]) || 0)
+  }
+
+  const currentSkill = typeof body.current_skill === 'string' && VALID_SKILL_TAGS.has(body.current_skill)
+    ? body.current_skill
+    : null
+
+  const db = getDb()
   db.prepare(`
     INSERT INTO math_progress (user_id, skill_mastery, current_skill, diagnostic_done, total_problems, total_correct, mistake_profile, skill_attempt_counts, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -61,13 +108,13 @@ export async function POST(req: NextRequest) {
       updated_at = excluded.updated_at
   `).run(
     session.userId,
-    JSON.stringify(body.skill_mastery || {}),
-    body.current_skill || null,
+    JSON.stringify(skillMastery),
+    currentSkill,
     body.diagnostic_done ? 1 : 0,
-    body.total_problems || 0,
-    body.total_correct || 0,
-    JSON.stringify(body.mistake_profile || {}),
-    JSON.stringify(body.skill_attempt_counts || {}),
+    totalProblems,
+    totalCorrect,
+    JSON.stringify(mistakeProfile),
+    JSON.stringify(skillAttemptCounts),
     Date.now(),
   )
 
