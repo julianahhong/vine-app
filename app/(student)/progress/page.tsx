@@ -1,11 +1,175 @@
 import { getSession } from '@/lib/auth'
 import getDb from '@/lib/db'
 import { ALL_MODULES } from '@/content/modules'
+import { SKILLS } from '@/lib/math'
+import ModeToggle from '../ModeToggle'
 
-export default async function ProgressPage() {
+const SESSION_LABELS: Record<string, string> = {
+  practice_5: '5 min', practice_10: '10 min',
+  flat_10: '10 Q', flat_25: '25 Q',
+  custom: 'Custom', diagnostic: 'Diagnostic',
+}
+
+function masteryColor(v: number) {
+  if (v >= 0.75) return 'bg-green-500'
+  if (v >= 0.4) return 'bg-yellow-400'
+  return 'bg-red-400'
+}
+
+function fmtTime(ms: number) {
+  const s = Math.round(ms / 1000)
+  return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
+}
+
+export default async function ProgressPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string }>
+}) {
+  const { mode } = await searchParams
+  const isMath = mode === 'math'
+
   const session = await getSession()
   const db = getDb()
 
+  if (isMath) {
+    const mathRow = db.prepare('SELECT * FROM math_progress WHERE user_id = ?').get(session!.userId) as {
+      skill_mastery: string; current_skill: string | null; diagnostic_done: number
+      total_problems: number; total_correct: number
+      mistake_profile: string; skill_attempt_counts: string
+    } | undefined
+
+    const mastery: Record<string, number> = mathRow ? JSON.parse(mathRow.skill_mastery) : {}
+    const profile: Record<string, number> = mathRow ? JSON.parse(mathRow.mistake_profile) : {}
+    const counts: Record<string, number> = mathRow ? JSON.parse(mathRow.skill_attempt_counts) : {}
+    const currentSkill = mathRow?.current_skill ?? null
+    const totalProblems = mathRow?.total_problems ?? 0
+    const totalCorrect = mathRow?.total_correct ?? 0
+
+    const recentSessions = db.prepare(
+      'SELECT * FROM math_sessions WHERE user_id = ? ORDER BY started_at DESC LIMIT 10'
+    ).all(session!.userId) as Array<{
+      id: string; session_type: string; started_at: number; ended_at: number
+      total_problems: number; correct: number; accuracy: number; current_skill: string
+    }>
+
+    const groups = [
+      { label: 'Addition & Subtraction', ops: ['addition', 'subtraction', 'mixed'] },
+      { label: 'Multiplication & Division', ops: ['multiplication', 'division'] },
+    ]
+    const totalMistakes = Object.values(profile).reduce((a, b) => a + b, 0)
+
+    return (
+      <div className="max-w-lg mx-auto w-full px-4 py-6">
+        <div className="flex justify-between items-center mb-1">
+          <h1 className="text-2xl font-bold text-green-800">Progress</h1>
+          <ModeToggle currentMode="math" />
+        </div>
+        <p className="text-gray-500 text-sm mb-6">Math arithmetic</p>
+
+        {/* Overall stats */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <p className="text-3xl font-bold text-green-700">{totalProblems}</p>
+            <p className="text-sm text-gray-600 mt-0.5">Problems solved</p>
+          </div>
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <p className="text-3xl font-bold text-blue-600">
+              {totalProblems ? Math.round(totalCorrect / totalProblems * 100) : 0}%
+            </p>
+            <p className="text-sm text-gray-600 mt-0.5">Overall accuracy</p>
+          </div>
+        </div>
+
+        {/* Skill mastery — always show all skills */}
+        <div className="mb-6">
+          <h3 className="font-bold text-gray-700 mb-3">Skill Mastery</h3>
+          {groups.map(g => {
+            const skills = SKILLS.filter(s => g.ops.includes(s.operation))
+            return (
+              <div key={g.label} className="mb-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{g.label}</p>
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+                  {skills.map(s => {
+                    const pct = Math.round((mastery[s.tag] ?? 0) * 100)
+                    const count = counts[s.tag] || 0
+                    return (
+                      <div key={s.tag}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className={`text-sm flex items-center gap-1.5 ${pct === 0 ? 'text-gray-400' : 'text-gray-700'}`}>
+                            {s.label}
+                            {s.tag === currentSkill && (
+                              <span className="bg-green-100 text-green-700 text-xs font-semibold px-1.5 py-0.5 rounded-full">current</span>
+                            )}
+                          </span>
+                          <span className={`text-sm font-bold ${pct === 0 ? 'text-gray-300' : 'text-green-700'}`}>{pct}%</span>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-2">
+                          {pct > 0 && (
+                            <div className={`h-2 rounded-full ${masteryColor(mastery[s.tag] ?? 0)}`} style={{ width: `${pct}%` }} />
+                          )}
+                        </div>
+                        {count > 0 && (
+                          <p className="text-xs text-gray-400 mt-0.5">{count} problems practiced</p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {totalProblems > 0 && (<>
+
+            {/* Mistake profile */}
+            {totalMistakes > 0 && (
+              <div className="mb-6">
+                <h3 className="font-bold text-gray-700 mb-3">Mistake Profile</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {Object.entries(profile).filter(([, v]) => v > 0).map(([k, v]) => (
+                    <div key={k} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                      <p className="text-2xl font-bold text-red-500">{v}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{k.replace(/_/g, ' ')}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recent sessions */}
+            {recentSessions.length > 0 && (
+              <div>
+                <h3 className="font-bold text-gray-700 mb-3">Recent Sessions</h3>
+                <div className="space-y-2">
+                  {recentSessions.map(s => {
+                    const d = new Date(s.started_at)
+                    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    const duration = s.ended_at - s.started_at
+                    return (
+                      <div key={s.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex justify-between items-center">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-700">{SESSION_LABELS[s.session_type] || s.session_type}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{s.total_problems} problems · {fmtTime(duration)} · {dateStr}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-base font-bold text-green-700">{s.accuracy}%</p>
+                          <p className="text-xs text-gray-400">{s.correct}/{s.total_problems}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    )
+  }
+
+  // ESL mode
   const moduleProgress = db.prepare('SELECT * FROM module_progress WHERE user_id = ?').all(session!.userId) as Array<{
     module_slug: string; vocab_viewed_at: number | null; practice_completed_at: number | null; teach_session_count: number; practice_score: number | null
   }>
@@ -25,7 +189,6 @@ export default async function ProgressPage() {
   const completedModules = moduleProgress.filter(m => m.practice_completed_at).length
   const totalTeachSessions = teachingSessions.length
 
-  // Last 7 days activity
   const last7 = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(Date.now() - i * 86400000)
     const date = d.toISOString().split('T')[0]
@@ -39,7 +202,10 @@ export default async function ProgressPage() {
 
   return (
     <div className="max-w-lg mx-auto w-full px-4 py-6">
-      <h1 className="text-2xl font-bold text-green-800 mb-1">Progress</h1>
+      <div className="flex justify-between items-center mb-1">
+        <h1 className="text-2xl font-bold text-green-800">Progress</h1>
+        <ModeToggle currentMode="esl" />
+      </div>
       <p className="text-gray-500 text-sm mb-6">Tu progreso</p>
 
       {/* Overview Stats */}
